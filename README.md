@@ -2,15 +2,15 @@
 Developing an LSTM-Based Machine Learning Model for Predicting TQQQ ROI on the Fifth Day
 
 # Requirements
-*Python 3.x
-Pandas
-NumPy
-TensorFlow
-Scikit-learn
-Matplotlib
-SQLite
-Logging
-Keras Tuner
+* Python 3.x
+* Pandas
+* NumPy
+* TensorFlow
+* Scikit-learn
+* Matplotlib
+* SQLite
+* Logging
+* Keras Tuner
 
 # Installation
 `git clone https://github.com/yourusername/tqqq-single-roi-prediction.git`
