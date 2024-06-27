@@ -13,8 +13,8 @@ Logging
 Keras Tuner
 
 # Installation
-git clone https://github.com/yourusername/tqqq-single-roi-prediction.git
-" cd tqqq-single-roi-prediction "
+'''git clone https://github.com/yourusername/tqqq-single-roi-prediction.git'''
+''' cd tqqq-single-roi-prediction '''
 
 
 # Usage
