@@ -2,7 +2,7 @@
 Developing an LSTM-Based Machine Learning Model for Predicting TQQQ ROI on the Fifth Day
 
 # Requirements
-Python 3.x
+*Python 3.x
 Pandas
 NumPy
 TensorFlow
