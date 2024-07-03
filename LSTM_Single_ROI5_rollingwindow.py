@@ -49,17 +49,13 @@ def Tqqq_preprocessed():
         # Convert 'Date' column to datetime
         Tqqq_data['Date'] = pd.to_datetime(Tqqq_data['Date'])
         
-        # Filter data for the last 13 years
-        cutoff_date = datetime.now() - timedelta(days=13*365)
-        Tqqq_data_last_13_years = Tqqq_data[Tqqq_data['Date'] >= cutoff_date]
-        logging.info(f"Data shape for the last 13 years: {Tqqq_data_last_13_years.shape}")
-        
+              
         # Sort data by date and reset index
-        Tqqq_data_last_13_years = Tqqq_data_last_13_years.sort_values('Date')
-        Tqqq_data_last_13_years = Tqqq_data_last_13_years.reset_index(drop=True)
+        Tqqq_data = Tqqq_data.sort_values('Date')
+        Tqqq_data = Tqqq_data.reset_index(drop=True)
         
         logging.info("Data preprocessing completed.")
-        return Tqqq_data_last_13_years
+        return Tqqq_data
     except Exception as e:
         logging.error(f"An error occurred during data preprocessing: {e}")
         raise
