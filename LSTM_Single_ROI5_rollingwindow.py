@@ -16,6 +16,7 @@ from keras_tuner import HyperModel
 from keras_tuner.tuners import RandomSearch
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.callbacks import LearningRateScheduler
+from scipy.stats import zscore
 
 
 # Configure logging for the script
@@ -38,6 +39,12 @@ def Tqqq_preprocessed():
         # Drop rows with missing values
         Tqqq_data = Tqqq_data.dropna()
         logging.info(f"Data shape after dropping missing values: {Tqqq_data.shape}")
+        
+         # Detect and handle outliers using Z-score method
+        Tqqq_data['zscore'] = zscore(Tqqq_data['Single_ROI_5'])
+        Tqqq_data = Tqqq_data[(Tqqq_data['zscore'] < 3) & (Tqqq_data['zscore'] > -3)]
+        Tqqq_data = Tqqq_data.drop(columns=['zscore'])
+        logging.info(f"Data shape after handling outliers: {Tqqq_data.shape}")
         
         # Convert 'Date' column to datetime
         Tqqq_data['Date'] = pd.to_datetime(Tqqq_data['Date'])
