@@ -17,6 +17,7 @@ from keras_tuner.tuners import RandomSearch
 from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint
 from tensorflow.keras.callbacks import LearningRateScheduler
 from scipy.stats import zscore
+import yfinance as yf
 
 
 # Configure logging for the script
@@ -188,7 +189,7 @@ def lr_schedule(epoch, lr):
 
 lr_scheduler = LearningRateScheduler(lr_schedule)
 
-
+# Function to train the LSTM model
 def train_lstm_model(X_train, y_train, X_valid, y_valid, sequence_length=5, num_features=1, epochs=100, 
                      batch_size=32, model_path='best_model.keras', forecast_horizon=5):
     try:
@@ -221,35 +222,119 @@ def train_lstm_model(X_train, y_train, X_valid, y_valid, sequence_length=5, num_
         logging.error(f"An error occurred during LSTM model training: {e}")
         raise
 
+# Function to calculate the risk free rate
+def calculate_5day_risk_free_rate(ticker="^IRX", periods_per_year=252, forecast_horizon=5):
+    """
+    Fetch the latest yield for the specified Treasury security and convert the annual risk-free rate 
+    to the corresponding forecast horizon rate.
 
-def evaluate_lstm_model(model, X_test, y_test):
+    Parameters:
+    ticker (str): The ticker symbol for the Treasury security (e.g., "^IRX" for 3-month Treasury bill).
+    periods_per_year (int): Number of trading days in a year (typically 252).
+    forecast_horizon (int): Number of days in the forecast horizon (e.g., 5 days).
+
+    Returns:
+    float: Risk-free rate for the forecast horizon.
+    """
+    # Fetch the historical market data
+    treasury_data = yf.Ticker(ticker)
+    hist = treasury_data.history(period="1d")
+    
+    # Get the latest yield
+    latest_yield = hist['Close'].iloc[-1]
+    
+    # Convert basis points to a decimal 
+    annual_rate = latest_yield / 100
+    
+    # Convert the annual rate to a daily rate
+    daily_rate = (1 + annual_rate) ** (1 / periods_per_year) - 1
+    
+    # Convert the daily rate to a forecast horizon rate (e.g., 5 days)
+    horizon_rate = (1 + daily_rate) ** forecast_horizon - 1
+    
+    return horizon_rate
+
+# Function to calculate the Sharpe ratio using 5-day returns
+def calculate_sharpe_ratio(returns, risk_free_rate, periods_per_year=252):
+    """
+    Calculate the Sharpe ratio for the given returns over the forecast horizon.
+
+    Parameters:
+    returns (np.array): Array of returns for the forecast horizon.
+    risk_free_rate (float): The risk-free rate for the forecast horizon (e.g., 0.0003 for 0.03% per day).
+    periods_per_year (int): Number of trading days in a year (typically 252).
+
+    Returns:
+    float: The Sharpe ratio.
+    """
+    # Calculate excess returns by subtracting the risk-free rate from returns
+    excess_returns = returns - risk_free_rate
+    
+    # Calculate the Sharpe ratio: mean of excess returns divided by their standard deviation
+    mean_excess_return = np.mean(excess_returns)
+    std_excess_return = np.std(excess_returns)
+    
+    if std_excess_return == 0:
+        return 0
+    
+    return mean_excess_return / std_excess_return
+
+# LSTM evaluate function
+def evaluate_lstm_model(model, X_test, y_test, risk_free_rate, forecast_horizon=5):
+    """
+    Evaluate the LSTM model on the test set and calculate performance metrics including Sharpe ratio.
+
+    Parameters:
+    model (tf.keras.Model): The trained LSTM model.
+    X_test (np.array): The test features.
+    y_test (np.array): The actual test values.
+    risk_free_rate (float): The risk-free rate for the forecast horizon (e.g., 0.0003 for 0.03% per day).
+    forecast_horizon (int): Number of days in the forecast horizon (e.g., 5 days).
+
+    Returns:
+    dict: A dictionary containing various evaluation metrics.
+    """
     try:
         logging.info("Starting LSTM model evaluation...")
-        
+
         # Evaluate the model on the test data
         test_loss = model.evaluate(X_test, y_test, verbose=0)
-        
+
         # Predict the values for the test set
         y_pred = model.predict(X_test)
-        
+
+        # Calculate excess returns for y_test and y_pred
+        actual_excess_returns = y_test.flatten() - risk_free_rate
+        predicted_excess_returns = y_pred.flatten() - risk_free_rate
+
         # Calculate evaluation metrics
         mse = mean_squared_error(y_test, y_pred)
         mae = mean_absolute_error(y_test, y_pred)
         r2 = r2_score(y_test, y_pred)
         rmse = np.sqrt(mse)
-        
+
+        # Calculate Sharpe ratio
+        predicted_sharpe_ratio = calculate_sharpe_ratio(predicted_excess_returns, risk_free_rate)
+        actual_sharpe_ratio = calculate_sharpe_ratio(actual_excess_returns, risk_free_rate)
+
         metrics = {
             'Loss': test_loss,
             'Mean Squared Error': mse,
             'Mean Absolute Error': mae,
             'R-squared': r2,
-            'Root Mean Squared Error': rmse
+            'Root Mean Squared Error': rmse,
+            'Predicted Sharpe Ratio': predicted_sharpe_ratio,
+            'Actual Sharpe Ratio': actual_sharpe_ratio
         }
-        
+
         # Log the evaluation metrics
         logging.info("Evaluation Metrics:")
         for key, value in metrics.items():
             logging.info(f"{key}: {value}")
+
+        # Print both Sharpe ratios
+        print(f"Predicted Sharpe Ratio: {predicted_sharpe_ratio}")
+        print(f"Actual Sharpe Ratio: {actual_sharpe_ratio}")
 
         # Plot Actual vs Predicted values
         plt.figure(figsize=(10, 5))
@@ -275,15 +360,16 @@ def evaluate_lstm_model(model, X_test, y_test):
         logging.error(f"An error occurred during model evaluation: {e}")
         raise
 
+# Function to plot residuals
 def plot_residuals(y_test, y_pred):
     try:
         logging.info("Starting residuals plotting...")
-        
+
         y_pred = y_pred.flatten()
         residuals = y_test.flatten() - y_pred
         logging.info(f"y_test shape: {y_test.shape}, y_pred shape: {y_pred.shape}")
         logging.info(f"Residuals range: {residuals.min()} to {residuals.max()}")
-        
+
         plt.figure(figsize=(10, 5))
         plt.scatter(y_pred, residuals, alpha=0.5)
         plt.axhline(0, color='r', linestyle='--', linewidth=1)
@@ -297,6 +383,7 @@ def plot_residuals(y_test, y_pred):
         logging.error(f"An error occurred while plotting residuals: {e}")
         raise
 
+# Function to compare predictions with actual values
 def compare_predictions(y_test, y_pred):
     try:
         logging.info("Comparing predictions with actual values...")
@@ -307,6 +394,7 @@ def compare_predictions(y_test, y_pred):
         logging.error(f"An error occurred while comparing predictions: {e}")
         raise
 
+# Function to predict the single ROI for the next 5 days
 def predict_single_roi_5_days(model, recent_data, scaler, start_date, sequence_length=5):
     try:
         logging.info("Starting single ROI prediction for 5 days ahead...")
@@ -337,6 +425,7 @@ def predict_single_roi_5_days(model, recent_data, scaler, start_date, sequence_l
         raise
 
 
+# Function to train and evaluate the baseline model
 def baseline_model(raw_train_data, raw_test_data, sequence_length=5, forecast_horizon=5):
     try:
         logging.info("Starting baseline model training...")
@@ -409,6 +498,7 @@ def baseline_model(raw_train_data, raw_test_data, sequence_length=5, forecast_ho
         logging.error(f"An error occurred during baseline model training and evaluation: {e}")
         raise
 
+# Function to perform cross-validation
 def cross_validate_model(X, y, sequence_length=5, num_features=1, n_splits=5):
     try:
         logging.info("Starting cross-validation...")
@@ -491,6 +581,10 @@ if __name__ == "__main__":
         # Split data into training, validation, and testing sets and scale it
         X_train, y_train, X_valid, y_valid, X_test, y_test, scaler, raw_train_data, raw_valid_data, raw_test_data = indicators_and_rolling_splitdata(data, sequence_length=time_steps, forecast_horizon=forecast_horizon)
 
+        # Calculate the 5-day risk-free rate using the 3-month Treasury bill
+        risk_free_rate_5day = calculate_5day_risk_free_rate("^IRX")
+        print(f"5-Day Risk-Free Rate used: {risk_free_rate_5day}")
+
         # Train the LSTM model
         model, history = train_lstm_model(X_train, y_train, X_valid, y_valid, sequence_length=time_steps, num_features=num_features, forecast_horizon=forecast_horizon)
 
@@ -498,7 +592,11 @@ if __name__ == "__main__":
         plot_training_history(history)
 
         # Evaluate the LSTM model
-        metrics = evaluate_lstm_model(model, X_test, y_test)
+        metrics = evaluate_lstm_model(model, X_test, y_test, risk_free_rate_5day)
+
+        # Log the additional metrics
+        logging.info(f"Predicted Sharpe Ratio: {metrics['Predicted Sharpe Ratio']}")
+        logging.info(f"Actual Sharpe Ratio: {metrics['Actual Sharpe Ratio']}")
 
         # Make predictions with the LSTM model
         y_pred = model.predict(X_test)
@@ -521,3 +619,4 @@ if __name__ == "__main__":
 
     except Exception as e:
         logging.error(f"An error occurred during the end-to-end process: {e}")
+
