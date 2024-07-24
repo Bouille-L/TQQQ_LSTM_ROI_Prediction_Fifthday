@@ -229,7 +229,7 @@ def calculate_5day_risk_free_rate(ticker="^IRX", periods_per_year=252, forecast_
     to the corresponding forecast horizon rate.
 
     Parameters:
-    ticker (str): The ticker symbol for the Treasury security (e.g., "^IRX" for 3-month Treasury bill).
+    ticker (str): The ticker symbol for the Treasury security ("^IRX" for 3-month Treasury bill).
     periods_per_year (int): Number of trading days in a year (typically 252).
     forecast_horizon (int): Number of days in the forecast horizon (e.g., 5 days).
 
@@ -249,7 +249,7 @@ def calculate_5day_risk_free_rate(ticker="^IRX", periods_per_year=252, forecast_
     # Convert the annual rate to a daily rate
     daily_rate = (1 + annual_rate) ** (1 / periods_per_year) - 1
     
-    # Convert the daily rate to a forecast horizon rate (e.g., 5 days)
+    # Convert the daily rate to a forecast horizon rate (5 days)
     horizon_rate = (1 + daily_rate) ** forecast_horizon - 1
     
     return horizon_rate
@@ -261,7 +261,7 @@ def calculate_sharpe_ratio(returns, risk_free_rate, periods_per_year=252):
 
     Parameters:
     returns (np.array): Array of returns for the forecast horizon.
-    risk_free_rate (float): The risk-free rate for the forecast horizon (e.g., 0.0003 for 0.03% per day).
+    risk_free_rate (float): The risk-free rate for the forecast horizon 
     periods_per_year (int): Number of trading days in a year (typically 252).
 
     Returns:
@@ -288,8 +288,8 @@ def evaluate_lstm_model(model, X_test, y_test, risk_free_rate, forecast_horizon=
     model (tf.keras.Model): The trained LSTM model.
     X_test (np.array): The test features.
     y_test (np.array): The actual test values.
-    risk_free_rate (float): The risk-free rate for the forecast horizon (e.g., 0.0003 for 0.03% per day).
-    forecast_horizon (int): Number of days in the forecast horizon (e.g., 5 days).
+    risk_free_rate (float): The risk-free rate for the forecast horizon
+    forecast_horizon (int): Number of days in the forecast horizon (5 days).
 
     Returns:
     dict: A dictionary containing various evaluation metrics.
